@@ -1,11 +1,11 @@
 // Офлайн-кэш: приложение открывается без сети, данные лежат в localStorage.
-const CACHE = 'kira-v2';
+const CACHE = 'kira-v3';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/util.js', 'js/store.js', 'js/logic.js',
   'js/views/week.js', 'js/views/homework.js', 'js/views/activities.js',
   'js/views/shifts.js', 'js/views/settings.js', 'js/views/pickers.js', 'js/views/formbits.js',
-  'js/sync.js', 'js/vendor/supabase.umd.js',
+  'js/sync.js', 'js/mesh.js', 'js/vendor/supabase.umd.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png',
 ];
 

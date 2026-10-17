@@ -102,9 +102,8 @@ export function render(ctx) {
   wrap.append(el('h3', { class: 'section-label', text: 'Общий доступ' }));
   wrap.append(cloudSection(ctx));
 
-  wrap.append(el('h3', { class: 'section-label', text: 'МЭШ (следующий этап)' }));
-  wrap.append(el('div', { class: 'card', style: { padding: '14px' } },
-    el('p', { class: 'hint', style: { margin: 0 }, text: 'Здесь будет кнопка «обновить расписание и домашку из дневника»: токен из браузера вставляется один раз, запросы идут через облачную функцию.' })));
+  wrap.append(el('h3', { class: 'section-label', text: 'Дневник МЭШ' }));
+  wrap.append(meshSection(ctx));
 
   wrap.append(el('p', { class: 'hint', style: { marginTop: '20px', textAlign: 'center' }, text: 'Расписание Киры · версия 2' }));
   return wrap;
@@ -139,6 +138,64 @@ function presetForm(ctx, code, p) {
       }),
     ];
   });
+}
+
+function meshSection(ctx) {
+  const mesh = state.settings.mesh;
+  const card = el('div', { class: 'card', style: { padding: '14px' } });
+
+  const when = mesh.lastImport
+    ? new Date(mesh.lastImport).toLocaleString('ru', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+    : null;
+  card.append(el('p', { class: 'hint', style: { margin: '0 0 12px' },
+    text: when ? `Последний снимок: ${when}${mesh.student ? ' · ' + mesh.student : ''}` : 'Снимок ещё не загружали.' }));
+
+  card.append(el('button', {
+    class: 'btn secondary', text: '1. Скопировать закладку',
+    onclick: async () => {
+      try {
+        const m = await import('../mesh.js');
+        const text = await m.bookmarkletText();
+        await navigator.clipboard.writeText(text);
+        ctx.toast('Закладка скопирована');
+      } catch (e) { ctx.toast('Не вышло: ' + (e.message || e)); }
+    },
+  }));
+  card.append(el('p', { class: 'hint', text: 'Создайте в браузере на компьютере любую закладку, откройте её свойства и вставьте скопированное вместо адреса. Назовите, например, «Снимок МЭШ».' }));
+
+  const box = el('textarea', { placeholder: 'сюда вставляется снимок', style: { minHeight: '70px', marginTop: '10px' } });
+  card.append(box);
+
+  const load = async (text) => {
+    try {
+      const m = await import('../mesh.js');
+      const r = m.applyText(text);
+      box.value = '';
+      ctx.toast(`Уроков: ${r.lessons}, заданий: ${r.homework}${r.removed ? ', снято: ' + r.removed : ''}`);
+      ctx.rerender();
+    } catch (e) { ctx.toast(e.message || String(e)); }
+  };
+
+  card.append(el('div', { class: 'btn-row' },
+    el('button', {
+      class: 'btn', text: '2. Вставить из буфера',
+      onclick: async () => {
+        try { await load(await navigator.clipboard.readText()); }
+        catch (e) { ctx.toast('Браузер не дал буфер — вставьте в поле выше вручную'); box.focus(); }
+      },
+    }),
+    el('button', { class: 'btn secondary', text: 'Из поля', onclick: () => load(box.value) })));
+
+  const keys = el('input', { type: 'text', value: (mesh.keywords || []).join(', ') });
+  keys.addEventListener('change', () => {
+    mesh.keywords = keys.value.split(',').map((x) => x.trim()).filter(Boolean);
+    state.settings.updatedAt = Date.now();
+    save(); ctx.rerender();
+  });
+  card.append(el('div', { style: { marginTop: '14px' } }, field('Какие предметы брать (часть слова, через запятую)', keys)));
+  card.append(el('p', { class: 'hint', style: { margin: 0 }, text: 'Закладка работает на сайте дневника, где вы уже вошли: токен остаётся в браузере и никуда не отправляется. Снимок берёт две недели — текущую и следующую.' }));
+
+  return card;
 }
 
 let syncPromise = null;

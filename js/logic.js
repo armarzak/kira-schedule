@@ -189,6 +189,13 @@ export function weekIssues(monday) {
   }, { none: 0, unknown: 0, soft: 0 });
 }
 
+/** Уроки из дневника на эту дату, по времени. */
+export function lessonsOn(date) {
+  return Object.values(state.lessons)
+    .filter((l) => l.date === date)
+    .sort((a, b) => String(a.start).localeCompare(String(b.start)));
+}
+
 export function homeworkOn(date) {
   return Object.values(state.homework).filter(h => h.date === date)
     .sort((a, b) => String(a.subject).localeCompare(String(b.subject), 'ru'));

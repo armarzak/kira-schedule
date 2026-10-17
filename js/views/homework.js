@@ -39,7 +39,7 @@ export function render(ctx) {
   }
 
   wrap.append(el('button', { class: 'btn', style: { marginTop: '14px' }, text: '+ Задание', onclick: () => form(ctx, null) }));
-  wrap.append(el('p', { class: 'hint', text: 'Пока задания вводятся руками. Когда подключим МЭШ, они будут подтягиваться сами, а эти останутся как заметки.' }));
+  wrap.append(el('p', { class: 'hint', text: 'Задания из дневника приходят снимком («Ещё» → «Дневник МЭШ»); добавленные здесь руками остаются как есть и снимком не затираются.' }));
   return wrap;
 }
 

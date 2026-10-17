@@ -2,7 +2,7 @@
 
 import { el, fmtDayShort, fmtWeekRange, todayISO, weekDates, weekdayOf, mondayOf, fromMin, ofName, readyText, plural, sheet, option } from '../util.js';
 import { state, personName, toggleSkip, isSkipped } from '../store.js';
-import { occurrencesOn, commitmentsOn, resolveLeg, legsOf, shiftLabel, homeworkOn, dayIssues, homeLeg } from '../logic.js';
+import { occurrencesOn, commitmentsOn, resolveLeg, legsOf, shiftLabel, homeworkOn, lessonsOn, dayIssues, homeLeg } from '../logic.js';
 import { pickShift, pickEscort, pickHome } from './pickers.js';
 
 const LEG_WORD = { to: 'Отвезти', from: 'Забрать' };
@@ -90,8 +90,21 @@ function occRow(occ, ctx) {
   legsBox.append(el('button', { class: 'leg', text: '⋯', title: 'Ещё', onclick: () => occMenu(occ, ctx) }));
   main.append(legsBox);
 
-  const hw = homeworkOn(occ.date).filter(h => occ.act.subject ? h.subject === occ.act.subject : false);
-  if (hw.length) main.append(el('div', { class: 'hw-line' }, el('b', { text: 'ДЗ:' }), hw.map(h => h.text).join('; ')));
+  // Под школьным блоком — уроки из дневника и что сдавать в этот день.
+  if (occ.act.type === 'school') {
+    const lessons = lessonsOn(occ.date);
+    if (lessons.length) main.append(el('div', { class: 'hw-line' },
+      el('b', { text: 'Уроки:' }),
+      lessons.map(l => `${shortSubject(l.subject)} ${l.start}`).join(' · ')));
+  }
+  const hw = homeworkOn(occ.date).filter(h => occ.act.type === 'school'
+    ? true
+    : (occ.act.subject && h.subject === occ.act.subject));
+  for (const h of hw.slice(0, 4)) {
+    main.append(el('div', { class: 'hw-line' + (h.done ? ' is-done' : '') },
+      el('b', { text: shortSubject(h.subject) + ':' }), h.text));
+  }
+  if (hw.length > 4) main.append(el('div', { class: 'hw-line', text: `…и ещё ${hw.length - 4}` }));
 
   li.append(main);
   return li;
@@ -121,6 +134,12 @@ function legButton(occ, kind, ctx) {
   }
   return el('button', { class: cls, onclick: () => pickEscort(occ, kind, ctx.rerender) },
     body, sub && el('small', { text: `· ${sub}` }));
+}
+
+/** «Русский язык» → «Рус.», чтобы строка уроков влезала на телефоне. */
+function shortSubject(name) {
+  const word = String(name || '').split(/[\s-]+/)[0];
+  return word.length > 5 ? word.slice(0, 3) + '.' : word;
 }
 
 function homeRow(date, h, ctx) {

@@ -50,14 +50,20 @@ function defaults() {
       viewer: null,                        // кто пользуется этим устройством
       subjects: DEFAULT_SUBJECTS,
       supabase: { url: '', anonKey: '', familyCode: '' },
-      mesh: { token: '', profileId: '', studentId: '' },
+      mesh: {
+        // По каким предметам тянем уроки и домашку. Сравнение по куску слова,
+        // чтобы «Литературное чтение» и «Литература» попадали одинаково.
+        keywords: ['русск', 'математ', 'окружа', 'англ', 'литерат'],
+        student: '', lastImport: null, token: '',
+      },
     },
     activities: {},   // занятия Киры: id -> {...}
     commitments: {},  // личные дела взрослых (спортзал и т.п.): id -> {...}
     shifts: {},       // 'person:YYYY-MM-DD' -> {code, start?, end?, updatedAt}
     assignments: {},  // 'actId@date:to' | ':from' -> {person, updatedAt}
     skips: {},        // 'actId@date' -> {updatedAt}  — занятие отменено в этот день
-    homework: {},     // id -> {date, subject, text, done, updatedAt}
+    homework: {},     // id -> {date, subject, text, done, source, cdz, updatedAt}
+    lessons: {},      // 'YYYY-MM-DD#N' -> {date, start, end, subject, updatedAt}
     tombstones: {},   // 'kind:id' -> {kind, updatedAt} — что удалили, чтобы удаление доехало до других
   };
 }
@@ -71,7 +77,7 @@ function migrate(s) {
   out.settings.supabase = { ...d.settings.supabase, ...(s.settings?.supabase || {}) };
   out.settings.mesh = { ...d.settings.mesh, ...(s.settings?.mesh || {}) };
   out.settings.sync = { ...d.settings.sync, ...(s.settings?.sync || {}) };
-  for (const k of ['activities', 'commitments', 'shifts', 'assignments', 'skips', 'homework', 'tombstones'])
+  for (const k of ['activities', 'commitments', 'shifts', 'assignments', 'skips', 'homework', 'lessons', 'tombstones'])
     out[k] = out[k] || {};
 
   // Переход на вторую версию: имена по умолчанию и бабушка вне подбора.
@@ -192,6 +198,23 @@ export function toggleSkip(actId, date) {
 }
 export const isSkipped = (actId, date) => !!state.skips[`${actId}@${date}`];
 
+/** Уроки из дневника за один день: старые за эту дату заменяются новыми. */
+export function replaceLessons(date, lessons) {
+  for (const key of Object.keys(state.lessons)) {
+    if (state.lessons[key].date === date) { delete state.lessons[key]; tomb('lesson', key); }
+  }
+  lessons.forEach((l, i) => {
+    const key = `${date}#${i}`;
+    state.lessons[key] = { ...l, date, updatedAt: Date.now() };
+  });
+  save();
+}
+
+export function removeHomeworkKey(key) {
+  if (!state.homework[key]) return;
+  delete state.homework[key]; tomb('homework', key); save();
+}
+
 export function upsertHomework(h) {
   h.id = h.id || uid(); h.updatedAt = Date.now();
   h.date = h.date || todayISO();
@@ -216,7 +239,7 @@ export const personName = id => state.settings.people[id]?.name || id;
 // Какая коллекция за какой вид записи отвечает при обмене с облаком.
 const COLLECTIONS = {
   activity: 'activities', commitment: 'commitments', homework: 'homework',
-  shift: 'shifts', assignment: 'assignments', skip: 'skips',
+  shift: 'shifts', assignment: 'assignments', skip: 'skips', lesson: 'lessons',
 };
 
 /** Всё, что изменилось после момента ts — в виде строк для облака. */
