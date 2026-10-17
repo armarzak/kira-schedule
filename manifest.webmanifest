@@ -1,0 +1,17 @@
+{
+  "name": "Расписание Киры",
+  "short_name": "Кира",
+  "description": "Неделя Киры: школа, допзанятия, домашка и кто везёт и забирает",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1116",
+  "theme_color": "#0f1116",
+  "lang": "ru",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
