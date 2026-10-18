@@ -1,7 +1,8 @@
 // Общие шиты выбора: смена на день и «кто везёт/забирает».
 
 import { el, sheet, option, field, fmtDayLong, fmtDayShort, toMin, fromMin, ofName, readyText } from '../util.js';
-import { state, SPECIAL_SHIFTS, presetsFor, setShift, getShift, setAssignment, getAssignment, personName } from '../store.js';
+import { state, SPECIAL_SHIFTS, presetsFor, setShift, getShift, setAssignment, getAssignment, personName, patchSettings, PEOPLE_ORDER } from '../store.js';
+import { hasPin, checkPin } from '../pin.js';
 import { availability, readyTime } from '../logic.js';
 
 export function pickShift(person, date, done = () => {}) {
@@ -106,5 +107,48 @@ export function pickHome(date, done = () => {}) {
       onclick: () => { setAssignment('home', date, 'home', null); close(); done(); },
     }));
     return opts;
+  });
+}
+
+/** Выбор человека за устройством. Чужая роль открывается только по ПИНу. */
+export function chooseViewer(done = () => {}) {
+  sheet('Кто пользуется этим устройством?', close => [
+    ...PEOPLE_ORDER.map(p => option({
+      title: personName(p),
+      sub: p === state.settings.viewer ? 'сейчас' : (hasPin(p) ? 'нужен ПИН' : null),
+      pressed: state.settings.viewer === p,
+      onclick: () => {
+        if (p === state.settings.viewer || !hasPin(p)) {
+          patchSettings({ viewer: p }); close(); done(); return;
+        }
+        close();
+        askPin(p, () => { patchSettings({ viewer: p }); done(); });
+      },
+    })),
+    el('p', { class: 'hint', text: 'Устройство запоминает выбор. ПИН спрашивается, только когда за него садится кто-то другой.' }),
+  ]);
+}
+
+/** Спросить ПИН человека. onOk вызывается, только если он сошёлся. */
+export function askPin(person, onOk, title) {
+  sheet(title || `ПИН — ${personName(person)}`, close => {
+    const input = el('input', {
+      type: 'password', inputmode: 'numeric', autocomplete: 'off',
+      placeholder: '····', style: { fontSize: '22px', letterSpacing: '6px', textAlign: 'center' },
+    });
+    const error = el('p', { class: 'hint', style: { color: 'var(--bad)', display: 'none' } });
+    const submit = async () => {
+      if (await checkPin(person, input.value)) { close(); onOk(); return; }
+      error.textContent = 'Не тот ПИН';
+      error.style.display = 'block';
+      input.value = '';
+      input.focus();
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    setTimeout(() => input.focus(), 150);
+    return [
+      field('Четыре цифры', input), error,
+      el('button', { class: 'btn', text: 'Войти', onclick: submit }),
+    ];
   });
 }

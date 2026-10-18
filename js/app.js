@@ -1,8 +1,10 @@
 // Сборка приложения: верхняя панель, переключение экранов, нижние вкладки.
 
-import { el, svgIcon, todayISO, mondayOf, addDays, sheet, option } from './util.js';
-import { state, subscribe, patchSettings, personName, PEOPLE_ORDER } from './store.js';
+import { el, svgIcon, todayISO, mondayOf, addDays } from './util.js';
+import { state, subscribe } from './store.js';
 import { weekIssues } from './logic.js';
+import { takeInviteFromUrl } from './invite.js';
+import { chooseViewer } from './views/pickers.js';
 import * as week from './views/week.js';
 import * as homework from './views/homework.js';
 import * as activities from './views/activities.js';
@@ -91,18 +93,9 @@ function toast(text) {
   toastTimer = setTimeout(() => box.classList.remove('in'), 2400);
 }
 
-function askViewer() {
-  sheet('Кто будет пользоваться этим устройством?', close => [
-    ...PEOPLE_ORDER.map(p => option({
-      title: personName(p),
-      onclick: () => { patchSettings({ viewer: p }); close(); render(); },
-    })),
-    el('p', { class: 'hint', text: 'Это можно поменять в «Ещё». Нужно, чтобы подсказки были обращены к нужному человеку.' }),
-  ]);
-}
 
 render();
-if (!state.settings.viewer) setTimeout(askViewer, 400);
+if (!state.settings.viewer) setTimeout(() => chooseViewer(render), 400);
 
 // Перерисовываем экран, когда данные меняются — в том числе после обмена с облаком.
 let renderQueued = false;
@@ -112,12 +105,33 @@ subscribe(() => {
   queueMicrotask(() => { renderQueued = false; render(); });
 });
 
+// Открыли по ссылке-приглашению — забираем настройки из адреса.
+const invited = takeInviteFromUrl();
+
+// Ссылку могли открыть, когда приложение уже открыто: тогда меняется только
+// адресная строка, без перезагрузки, и приглашение нужно подхватить руками.
+window.addEventListener('hashchange', async () => {
+  if (!takeInviteFromUrl()) return;
+  try {
+    const m = await import('./sync.js');
+    await m.start();
+    toast('Устройство подключено к семье');
+  } catch (e) {
+    toast('Не удалось подключиться: ' + (e.message || e));
+  }
+  render();
+});
+
 // Облако подключается само, если настроено. Без него приложение работает как раньше.
 const cloud = state.settings.supabase;
 if (cloud.url && cloud.anonKey && cloud.familyCode) {
   import('./sync.js')
     .then(m => m.start())
-    .catch(e => console.warn('Синхронизация не стартовала:', e.message || e));
+    .then(() => { if (invited) toast('Устройство подключено к семье'); })
+    .catch(e => {
+      console.warn('Синхронизация не стартовала:', e.message || e);
+      if (invited) toast('Не удалось подключиться: ' + (e.message || e));
+    });
 }
 
 // На localhost офлайн-кэш только мешает разработке — там он не нужен.

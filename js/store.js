@@ -45,6 +45,7 @@ function defaults() {
       schoolPickupByGrandma: true,         // из школы Киру всегда забирает Оля
       homeBy: '20:00',                     // к этому времени Кира должна быть дома
       shiftPresets: DEFAULT_PRESETS,
+      pins: {},                            // отпечатки ПИНов, по человеку
       updatedAt: 0,                        // когда последний раз меняли общие настройки
       sync: { familyId: null, lastPulled: null, lastPushedAt: 0 },
       viewer: null,                        // кто пользуется этим устройством
@@ -231,7 +232,7 @@ export function patchSettings(patch) {
 }
 /** Настройки, общие для всей семьи. Остальное (кто за устройством, ключи) — местное. */
 const SHARED_SETTINGS = ['people', 'adults', 'priority', 'bufferMin', 'grandmaDefaultFree',
-  'schoolPickupByGrandma', 'homeBy', 'subjects', 'shiftPresets'];
+  'schoolPickupByGrandma', 'homeBy', 'subjects', 'shiftPresets', 'pins'];
 const pickShared = src => Object.fromEntries(
   SHARED_SETTINGS.filter(k => src?.[k] !== undefined).map(k => [k, src[k]]));
 export const personName = id => state.settings.people[id]?.name || id;

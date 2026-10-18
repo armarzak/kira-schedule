@@ -3,6 +3,8 @@
 import { el, field, sheet, option, confirmSheet } from '../util.js';
 import { state, patchSettings, personName, PEOPLE_ORDER, save, exportJSON, importJSON, resetAll,
   upsertPreset, removePreset } from '../store.js';
+import { hasPin, setPin, clearPin, canReset } from '../pin.js';
+import { chooseViewer } from './pickers.js';
 
 export const title = () => ({ text: 'Настройки', sub: 'люди, правила и данные' });
 
@@ -18,6 +20,19 @@ export function render(ctx) {
         el('div', { class: 'row-title', text: 'Кто пользуется' }),
         el('div', { class: 'row-sub', text: s.viewer ? personName(s.viewer) : 'не выбрано' })),
       el('div', { class: 'row-right', text: '›' }))));
+
+  // --- ПИНы ---
+  wrap.append(el('h3', { class: 'section-label', text: 'ПИН на смену человека' }));
+  const pins = el('div', { class: 'card' });
+  for (const p of PEOPLE_ORDER) {
+    pins.append(el('button', { class: 'row', onclick: () => pinSheet(ctx, p) },
+      el('div', { class: 'row-main' },
+        el('div', { class: 'row-title', text: personName(p) }),
+        el('div', { class: 'row-sub', text: hasPin(p) ? 'ПИН задан' : 'без ПИНа' })),
+      el('div', { class: 'row-right', text: '›' })));
+  }
+  wrap.append(pins);
+  wrap.append(el('p', { class: 'hint', text: 'Пока ПИНа нет, переключиться на человека можно без вопросов.' }));
 
   // --- имена ---
   wrap.append(el('h3', { class: 'section-label', text: 'Имена' }));
@@ -198,6 +213,46 @@ function meshSection(ctx) {
   return card;
 }
 
+/** QR и ссылка, по которым остальные подключаются без ввода трёх строк. */
+function shareSheet(ctx) {
+  sheet('Подключить ещё устройство', close => {
+    const box = el('div', { style: { textAlign: 'center', minHeight: '240px' } },
+      el('p', { class: 'hint', text: 'готовлю QR…' }));
+    const link = el('input', { type: 'text', readonly: true, value: '', style: { marginTop: '12px' } });
+
+    (async () => {
+      try {
+        const inv = await import('../invite.js');
+        const url = inv.inviteLink();
+        link.value = url;
+        const canvas = await inv.inviteQr(url);
+        canvas.style.borderRadius = '12px';
+        box.textContent = '';
+        box.append(canvas);
+      } catch (e) {
+        box.textContent = '';
+        box.append(el('p', { class: 'hint', text: 'QR не получился: ' + (e.message || e) }));
+      }
+    })();
+
+    return [
+      box,
+      el('p', { class: 'hint', text: 'Наведите камеру телефона — приложение откроется уже настроенным, останется выбрать, кто им пользуется.' }),
+      field('Или ссылка', link),
+      el('button', {
+        class: 'btn', text: 'Скопировать ссылку',
+        onclick: async () => {
+          try { await navigator.clipboard.writeText(link.value); ctx.toast('Ссылка скопирована'); }
+          catch (e) { link.select(); ctx.toast('Скопируйте выделенное вручную'); }
+        },
+      }),
+      el('p', { class: 'hint', style: { color: 'var(--warn)' },
+        text: 'В ссылке лежит семейный код — это пароль от ваших данных. Отправляйте её только своим и в личной переписке.' }),
+      el('button', { class: 'btn secondary', style: { marginTop: '8px' }, text: 'Закрыть', onclick: close }),
+    ];
+  });
+}
+
 let syncPromise = null;
 const loadSync = () => (syncPromise ||= import('../sync.js'));
 
@@ -232,6 +287,10 @@ function cloudSection(ctx) {
   card.append(connect);
 
   if (cfg.url) {
+    card.append(el('button', {
+      class: 'btn', style: { marginTop: '10px' }, text: 'Поделиться настройкой',
+      onclick: () => shareSheet(ctx),
+    }));
     card.append(el('div', { class: 'btn-row' },
       el('button', {
         class: 'btn secondary', text: 'Синхронизировать сейчас',
@@ -269,11 +328,38 @@ function move(i, dir, ctx) {
 }
 
 function pickViewer(ctx) {
-  sheet('Кто пользуется этим устройством?', close => PEOPLE_ORDER.map(p => option({
-    title: personName(p),
-    pressed: state.settings.viewer === p,
-    onclick: () => { patchSettings({ viewer: p }); close(); ctx.rerender(); },
-  })));
+  chooseViewer(ctx.rerender);
+}
+
+/** Задать, сменить или убрать ПИН человека. */
+function pinSheet(ctx, person) {
+  const already = hasPin(person);
+  const viewer = state.settings.viewer;
+  const mayReset = canReset(viewer) || viewer === person;
+  sheet(`ПИН — ${personName(person)}`, close => {
+    const input = el('input', { type: 'password', inputmode: 'numeric', autocomplete: 'off', placeholder: 'от 4 до 8 цифр' });
+    const error = el('p', { class: 'hint', style: { color: 'var(--bad)', display: 'none' } });
+    const out = [];
+    if (already && !mayReset) {
+      out.push(el('p', { class: 'hint', text: `ПИН уже задан. Сменить его может ${personName(person)} или взрослый.` }));
+      out.push(el('button', { class: 'btn secondary', text: 'Закрыть', onclick: close }));
+      return out;
+    }
+    out.push(field(already ? 'Новый ПИН' : 'Придумайте ПИН', input), error);
+    out.push(el('button', {
+      class: 'btn', text: 'Сохранить',
+      onclick: async () => {
+        try { await setPin(person, input.value); close(); ctx.toast('ПИН сохранён'); ctx.rerender(); }
+        catch (e) { error.textContent = e.message || String(e); error.style.display = 'block'; }
+      },
+    }));
+    if (already) out.push(el('button', {
+      class: 'btn danger', style: { marginTop: '8px' }, text: 'Убрать ПИН',
+      onclick: () => { clearPin(person); close(); ctx.toast('ПИН убран'); ctx.rerender(); },
+    }));
+    out.push(el('p', { class: 'hint', text: 'ПИН общий для всех устройств семьи и нужен, только чтобы переключиться на этого человека. Данные он не шифрует — от чужих защищает блокировка телефона.' }));
+    return out;
+  });
 }
 
 function doExport() {
