@@ -98,12 +98,6 @@ export function resolveLeg(occ, kind) {
   const manual = getAssignment(occ.act.id, occ.date, kind);
   if (manual) return { mode: 'manual', person: manual, avail: availability(manual, occ.date, min), min };
 
-  // Из школы Киру всегда забирает Оля и ведёт к себе.
-  if (kind === 'from' && occ.act.type === 'school' && state.settings.schoolPickupByGrandma) {
-    const a = availability('grandma', occ.date, min);
-    return { mode: a.status === 'busy' ? 'fixed-busy' : 'fixed', person: 'grandma', avail: a, min };
-  }
-
   const list = candidates().map(p => ({ person: p, a: availability(p, occ.date, min) }));
   const free = list.filter(c => c.a.status === 'free');
   if (free.length) return { mode: 'auto', person: free[0].person, options: free.map(c => c.person), min };
@@ -114,8 +108,13 @@ export function resolveLeg(occ, kind) {
   return { mode: 'none', min };
 }
 
-/** Нужные «плечи» занятия: отвезти и/или забрать. */
+/** Школа идёт по уговору: утром отводим вместе, из школы забирает бабушка. */
+export const isSchoolByRule = (act) =>
+  act.type === 'school' && state.settings.schoolPickupByGrandma;
+
+/** Нужные «плечи» занятия: отвезти и/или забрать. У школы их нет. */
 export function legsOf(occ) {
+  if (isSchoolByRule(occ.act)) return [];
   const out = [];
   if (occ.act.needTo) out.push('to');
   if (occ.act.needFrom) out.push('from');
@@ -172,7 +171,7 @@ export function dayIssues(date) {
     if (occ.skipped) continue;
     for (const kind of legsOf(occ)) {
       const r = resolveLeg(occ, kind);
-      if (r.mode === 'none' || r.mode === 'fixed-busy') none++;
+      if (r.mode === 'none') none++;
       else if (r.mode === 'unknown') unknown++;
       else if (r.mode === 'soft') soft++;
     }

@@ -2,7 +2,7 @@
 
 import { el, fmtDayShort, fmtWeekRange, todayISO, weekDates, weekdayOf, mondayOf, fromMin, ofName, readyText, plural, sheet, option } from '../util.js';
 import { state, personName, toggleSkip, isSkipped } from '../store.js';
-import { occurrencesOn, commitmentsOn, resolveLeg, legsOf, shiftLabel, homeworkOn, lessonsOn, dayIssues, homeLeg } from '../logic.js';
+import { occurrencesOn, commitmentsOn, resolveLeg, legsOf, isSchoolByRule, shiftLabel, homeworkOn, lessonsOn, dayIssues, homeLeg } from '../logic.js';
 import { pickShift, pickEscort, pickHome } from './pickers.js';
 
 const LEG_WORD = { to: 'Отвезти', from: 'Забрать' };
@@ -80,7 +80,10 @@ function occRow(occ, ctx) {
 
   const legs = legsOf(occ);
   const legsBox = el('div', { class: 'legs' });
-  if (!legs.length) {
+  if (isSchoolByRule(occ.act)) {
+    legsBox.append(el('span', { class: 'leg self',
+      text: `Вместе · забирает ${personName('grandma')}` }));
+  } else if (!legs.length) {
     legsBox.append(el('span', { class: 'leg self', text: `${personName('kira')} сама` }));
   } else if (occ.skipped) {
     legsBox.append(el('span', { class: 'leg self', text: 'отменено' }));
@@ -114,11 +117,7 @@ function legButton(occ, kind, ctx) {
   const r = resolveLeg(occ, kind);
   const word = LEG_WORD[kind];
   let cls = 'leg', body, sub = null;
-  if (r.mode === 'fixed') {
-    cls += ' self'; body = `Из школы: ${personName(r.person)}`; sub = 'всегда';
-  } else if (r.mode === 'fixed-busy') {
-    cls += ' bad'; body = `Из школы: ${personName(r.person)} занята`; sub = 'некому забрать';
-  } else if (r.mode === 'manual') {
+  if (r.mode === 'manual') {
     const bad = r.avail.status === 'busy';
     cls += bad ? ' bad' : ' ok';
     body = `${word}: ${personName(r.person)}`;

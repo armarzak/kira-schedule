@@ -29,7 +29,9 @@ function listCard(items, ctx, emptyText) {
   if (!items.length) { card.append(el('p', { class: 'empty', text: emptyText })); return card; }
   for (const a of items) {
     const when = a.date ? fmtDayShort(a.date) : (a.days || []).map(d => DOW_SHORT[d]).join(', ');
-    const help = !a.needTo && !a.needFrom ? `${personName('kira')} сама`
+    const byRule = a.type === 'school' && state.settings.schoolPickupByGrandma;
+    const help = byRule ? `вместе · забирает ${personName('grandma')}`
+      : !a.needTo && !a.needFrom ? `${personName('kira')} сама`
       : [a.needTo && 'отвезти', a.needFrom && 'забрать'].filter(Boolean).join(' и ');
     card.append(el('button', { class: 'row', onclick: () => form(ctx, a) },
       el('div', { class: 'row-main' },
@@ -66,6 +68,14 @@ export function form(ctx, a) {
     const times = timeRow(a.start, a.end);
     const needTo = checkbox('Нужно отвезти', a.needTo);
     const needFrom = checkbox('Нужно забрать', a.needFrom);
+    const helpNote = el('p', { class: 'hint', text: 'Школа идёт по уговору: утром отводите вместе, из школы забирает бабушка. Расчёт для неё не нужен.' });
+    const syncType = () => {
+      const school = type.value === 'school' && state.settings.schoolPickupByGrandma;
+      needTo.node.style.display = school ? 'none' : 'flex';
+      needFrom.node.style.display = school ? 'none' : 'flex';
+      helpNote.style.display = school ? 'block' : 'none';
+    };
+    type.addEventListener('change', syncType); syncType();
     const from = el('input', { type: 'date', value: a.from || '' });
     const to = el('input', { type: 'date', value: a.to || '' });
 
@@ -74,7 +84,7 @@ export function form(ctx, a) {
       el('div', { class: 'field-row' }, field('Тип', type), field('Предмет (для ДЗ)', subject)),
       field('Место', place),
       once.node, daysField, dateField, times.node,
-      needTo.node, needFrom.node,
+      needTo.node, needFrom.node, helpNote,
       el('p', { class: 'hint', text: 'Если оба выключены — Кира ходит сама, логистика не считается.' }),
       el('div', { class: 'field-row', style: { marginTop: '12px' } }, field('Действует с', from), field('по', to)),
       el('button', {

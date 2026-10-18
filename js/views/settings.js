@@ -70,7 +70,7 @@ export function render(ctx) {
   wrap.append(el('div', { class: 'card', style: { padding: '14px' } },
     field('Кира должна быть дома к', home),
     field('Запас до и после смены, минут', buf),
-    el('label', { class: 'check' }, school, el('span', { text: `Из школы всегда забирает ${personName('grandma')}` })),
+    el('label', { class: 'check' }, school, el('span', { text: `Школу отводим вместе, забирает ${personName('grandma')}` })),
     el('label', { class: 'check' }, gran, el('span', { text: `${personName('grandma')} свободна, если день не заполнен` }))));
   wrap.append(el('p', { class: 'hint', text: `Если никто из вас не освобождается до этого времени, приложение ставит «${personName('grandma')} приведёт сама».` }));
 
