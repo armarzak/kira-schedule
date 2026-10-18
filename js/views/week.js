@@ -81,8 +81,7 @@ function occRow(occ, ctx) {
   const legs = legsOf(occ);
   const legsBox = el('div', { class: 'legs' });
   if (isSchoolByRule(occ.act)) {
-    legsBox.append(el('span', { class: 'leg self',
-      text: `Вместе · забирает ${personName('grandma')}` }));
+    // Школа идёт по уговору — писать про неё в каждом дне нечего.
   } else if (!legs.length) {
     legsBox.append(el('span', { class: 'leg self', text: `${personName('kira')} сама` }));
   } else if (occ.skipped) {
