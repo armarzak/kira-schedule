@@ -1,5 +1,5 @@
 // Офлайн-кэш: приложение открывается без сети, данные лежат в localStorage.
-const CACHE = 'kira-v3';
+const CACHE = 'kira-v4';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/app.js', 'js/util.js', 'js/store.js', 'js/logic.js',
@@ -18,9 +18,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-  // Сначала сеть (чтобы обновления приходили сразу), при отсутствии связи — кэш.
+  // Сначала сеть, причём мимо обычного кэша браузера: GitHub Pages отдаёт файлы
+  // с запасом на десять минут, и без этого обновление доезжало бы с опозданием.
+  // Кэш остаётся запасом на случай, когда сети нет.
   e.respondWith(
-    fetch(req).then(res => {
+    fetch(req.url, { cache: 'reload', credentials: 'same-origin' }).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req))
